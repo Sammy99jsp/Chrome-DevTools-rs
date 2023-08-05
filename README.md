@@ -1,5 +1,5 @@
 # What is this?
-Some Rust bindings fro the Chrome Dev Tools protocol (stable version v1.3).
+Some Rust bindings for the Chrome Dev Tools protocol (stable version v1.3).
 
 This would be better expressed in the form of a proc-macro, but that seemed worse than doing this.
 
