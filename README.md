@@ -3,4 +3,4 @@ Rust bindings for the Chrome DevTools protocol (officially supporting stable ver
 
 ## Feature Flags
 ### \*`latest`
-Enable `latest` to fetch the latest protocols from the [DevTools GitHub](https://chromedevtools.github.io/devtools-protocol/)
+Enable `latest` to fetch the latest protocols from the [DevTools GitHub](https://github.com/ChromeDevTools/devtools-protocol)
