@@ -1,3 +1,6 @@
+# Chrome DevTools Protocol API
+Rust bindings for the Chrome DevTools protocol (officially supporting stable version V1.3*).
 
-## TODOs
-- [ ] Support for `deprecated`, `experimental` markers on fields, type declarations, commands, events, and domains. 
+## Feature Flags
+### \*`latest`
+Enable `latest` to fetch the latest protocols from the [DevTools GitHub](https://chromedevtools.github.io/devtools-protocol/)

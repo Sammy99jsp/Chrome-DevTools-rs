@@ -1,5 +1,0 @@
-1. Elegancy:
-    1.1 - Remove the OutTokens enum and just use syn::Item
-2. Additional Features:
-    2.1 - Add support for #[deprecated]
-    
