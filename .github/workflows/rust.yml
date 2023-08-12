@@ -22,7 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: simonhyll/cargo-audit@v1.0.0
-      - name: Cargo Audit
+        name: Cargo Audit
   clippy_check:
     runs-on: ubuntu-latest
     steps:
