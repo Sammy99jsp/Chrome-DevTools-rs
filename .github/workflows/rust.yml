@@ -10,19 +10,6 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v3
-    - name: Build
-      run: cargo build --verbose
-    - name: Run tests
-      run: cargo test --verbose
-  audit:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: simonhyll/cargo-audit@v1.0.0
-        name: Cargo Audit
   clippy_check:
     runs-on: ubuntu-latest
     steps:
@@ -36,3 +23,11 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           args: --all-features
+      - name: Run tests
+        run: cargo test --verbose
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Auditing (rust-audit-check)
+        uses: actions-rs/audit-check@v1.2.0
+
