@@ -1,0 +1,5 @@
+# This file determines the urls for the protocol.json files. Seperate each URL with a newline (\n). :)
+# IMPORTTANT: Put `browser_protocol.json`, then `js_protocol.json`
+# Latest Update 20203-08-12 
+https://raw.githubusercontent.com/ChromeDevTools/devtools-protocol/master/json/browser_protocol.json
+https://raw.githubusercontent.com/ChromeDevTools/devtools-protocol/master/json/js_protocol.json
