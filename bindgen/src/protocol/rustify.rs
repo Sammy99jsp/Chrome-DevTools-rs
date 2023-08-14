@@ -281,7 +281,6 @@ impl Rustify for Field {
         let ctx = ctx.next(self.name.clone());
         let ident = self.name.clone().rustify(span, ctx.clone());
 
-
         let attrs = deprecated_docs_experimental(
             ctx.clone(),
             span,
@@ -382,7 +381,6 @@ impl Command {
             _ => unimplemented!(),
         };
 
-
         let ident = syn::Ident::new(&deriv_name, span);
 
         let fields = fields.into_iter().flatten().collect::<Vec<_>>();
@@ -474,7 +472,10 @@ impl Command {
         let stmt = syn::Stmt::Expr(
             syn::Expr::Lit(syn::ExprLit {
                 attrs: Default::default(),
-                lit: syn::Lit::Str(syn::LitStr::new(&format!("{}.{}", d.original(), s.original()), span)),
+                lit: syn::Lit::Str(syn::LitStr::new(
+                    &format!("{}.{}", d.original(), s.original()),
+                    span,
+                )),
             }),
             None,
         );
@@ -529,9 +530,7 @@ impl Rustify for Command {
     fn rustify(self, span: Span, ctx: Option<util::Context>) -> Self::Output {
         let ctx = ctx.next(self.name.clone());
         let ident = self.name.clone().rustify(span, ctx.clone());
-        let impl_block =
-            syn::Item::Impl(self.gen_command_impl(span, ctx.clone(), &ident));
-
+        let impl_block = syn::Item::Impl(self.gen_command_impl(span, ctx.clone(), &ident));
 
         let attrs = deprecated_docs_experimental(
             ctx.clone(),
@@ -636,7 +635,10 @@ impl Rustify for Event {
         let stmt = syn::Stmt::Expr(
             syn::Expr::Lit(syn::ExprLit {
                 attrs: Default::default(),
-                lit: syn::Lit::Str(syn::LitStr::new(&format!("{}.{}", d.original(), e.original()), span)),
+                lit: syn::Lit::Str(syn::LitStr::new(
+                    &format!("{}.{}", d.original(), e.original()),
+                    span,
+                )),
             }),
             None,
         );
@@ -655,6 +657,39 @@ impl Rustify for Event {
                 paren_token: Default::default(),
                 variadic: Default::default(),
                 ident: syn::Ident::new("id", span),
+                inputs: Punctuated::from_iter(iter::once(syn::FnArg::Receiver(syn::Receiver {
+                    attrs: vec![],
+                    reference: Some((Default::default(), None)),
+                    mutability: None,
+                    self_token: Default::default(),
+                    colon_token: None,
+                    ty: Box::new(util::rust::self_ref(span)),
+                }))),
+                output: syn::ReturnType::Type(
+                    Default::default(),
+                    Box::new(util::rust::static_str(span)),
+                ),
+            },
+            block: syn::Block {
+                brace_token: Default::default(),
+                stmts: vec![stmt.clone()],
+            },
+        });
+
+        let id_fn2 = syn::ImplItem::Fn(syn::ImplItemFn {
+            attrs: Default::default(),
+            defaultness: Default::default(),
+            vis: syn::Visibility::Inherited,
+            sig: syn::Signature {
+                constness: Default::default(),
+                asyncness: Default::default(),
+                unsafety: Default::default(),
+                abi: Default::default(),
+                fn_token: Default::default(),
+                generics: Default::default(),
+                paren_token: Default::default(),
+                variadic: Default::default(),
+                ident: syn::Ident::new("__id", span),
                 inputs: Punctuated::from_iter(iter::empty::<syn::FnArg>()),
                 output: syn::ReturnType::Type(
                     Default::default(),
@@ -678,7 +713,7 @@ impl Rustify for Event {
             trait_: Some((None, trait_path, Default::default())),
             self_ty: Box::new([ident.clone()].to_type_path().into()),
             brace_token: Default::default(),
-            items: vec![id_fn]
+            items: vec![id_fn, id_fn2],
         });
 
         additional.chain([strct, impl_block]).collect()

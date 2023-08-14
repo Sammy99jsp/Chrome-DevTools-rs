@@ -7,7 +7,7 @@ use serde::{
 /// Any event sent by the server to the client.
 /// 
 pub trait Event : Serialize {
-    fn id() -> &'static str
+    fn id(&self) -> &'static str
         where Self: Sized;
 }
 
