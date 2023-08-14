@@ -1,8 +1,8 @@
 pub mod convention;
 pub mod modular;
 pub mod parsing;
-pub mod rustify;
 mod post_ast;
+pub mod rustify;
 
 use convention as conv;
 use modular as m;
@@ -35,7 +35,7 @@ pub enum Primitive {
 
     ///
     /// Any type ([serde_json::Value])
-    /// 
+    ///
     Any,
 }
 
@@ -71,14 +71,17 @@ pub enum Type {
     ///
     /// Equivalent to a struct.
     ///
-    Object { fields: Option<Vec<Field>>, optional: bool },
+    Object {
+        fields: Option<Vec<Field>>,
+        optional: bool,
+    },
     ///
     /// Enum of different values of the same type.
     ///
     /// For now, only string enums are allowed.
     ///
     Enum {
-        values: Vec<modular::Identifier<conv::Type>>,
+        values: Vec<modular::NamedIdentifier<conv::Type>>,
         optional: bool,
     },
 }
@@ -94,7 +97,7 @@ pub struct Field {
     ///
     /// Identifier for this field.
     ///
-    name: modular::Identifier<conv::Field>,
+    name: modular::NamedIdentifier<conv::Field>,
 
     //
     /// Optional documentation.
@@ -126,7 +129,7 @@ pub struct TypeDeclaration {
     ///
     /// Identifier for this type declaration.
     ///
-    id: m::Identifier<conv::Type>,
+    id: m::NamedIdentifier<conv::Type>,
 
     //
     /// Optional documentation.
@@ -165,7 +168,7 @@ pub struct Command {
     ///
     /// This command's identifier.
     ///
-    name: m::Identifier<conv::Command>,
+    name: m::NamedIdentifier<conv::Command>,
 
     //
     /// Optional documentation.
@@ -206,7 +209,7 @@ pub struct Event {
     /// This event's identifier, with the additional naming convention:
     /// `${EVENT}Event`.
     ///
-    name: m::Identifier<conv::Event>,
+    name: m::NamedIdentifier<conv::Event>,
 
     //
     /// Optional documentation.
@@ -236,7 +239,7 @@ pub struct Event {
 /// Represented as a `use` item.
 ///
 #[derive(Debug, Clone, serde::Deserialize)]
-pub struct DomainDependency(m::Identifier<conv::Domain>);
+pub struct DomainDependency(m::NamedIdentifier<conv::Domain>);
 
 ///
 /// A collection of [TypeDeclaration], [Command], [Event] types,
@@ -247,7 +250,7 @@ pub struct Domain {
     ///
     /// Identifier for this domain.
     ///
-    domain: m::Identifier<conv::Domain>,
+    domain: m::NamedIdentifier<conv::Domain>,
 
     ///
     /// Optional documentation.

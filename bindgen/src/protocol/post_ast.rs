@@ -141,9 +141,11 @@ mod tests {
     use syn::punctuated::Punctuated;
 
     use crate::{
-        protocol,
+        protocol::{self, modular::{Identifier, NamedIdentifier, IntoAnyIdentifier}},
         util::{Context, Rustify},
     };
+
+    use crate::protocol::convention;
 
     use super::{is_self_referential, walk_type_path};
 
@@ -187,7 +189,7 @@ mod tests {
 
         let test_case = &mut test_case.rustify(
             proc_macro2::Span::call_site(),
-            Context::Domain("Debugger".to_string()).into(),
+            Context::Domain(NamedIdentifier::<convention::Domain>::new("Debugger").to_any()).into(),
         )[0];
 
         println!("{}\n\n", test_case.into_token_stream());

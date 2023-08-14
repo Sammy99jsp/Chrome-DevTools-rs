@@ -13,6 +13,7 @@ use convert_case::{Case, Casing};
 use proc_macro2::Span;
 use syn::punctuated::Punctuated;
 
+use crate::protocol::modular::Identifier;
 use crate::util::ToPath;
 use crate::util::{
     self,
@@ -201,18 +202,19 @@ impl Rustify for Type {
 
                     let ident = Contextual::iter(&ctx)
                         .skip(1)
-                        .map(|s| s.to_case(Case::Snake))
+                        .map(|s| s.as_ref().to_case(Case::Snake))
                         .intersperse("_".to_string())
                         .collect::<String>();
 
-                    let ident = m::Identifier::<conv::Type>::new(ident).rustify(span, ctx.clone());
+                    let ident =
+                        m::NamedIdentifier::<conv::Type>::new(ident).rustify(span, ctx.clone());
 
                     let attrs = util::info::autogenned_enum(&ctx, span);
                     let (ty, _) = Type::Reference {
                         optional,
                         path: m::TypePath(
                             None,
-                            m::Identifier::<conv::Type>::new(ident.to_string()),
+                            m::NamedIdentifier::<conv::Type>::new(ident.to_string()),
                         ),
                     }
                     .rustify(span, ctx);
@@ -275,10 +277,10 @@ impl Rustify for Field {
     type Output = (syn::Field, Vec<syn::Item>);
 
     fn rustify(self, span: Span, ctx: Option<crate::util::Context>) -> Self::Output {
+        // Update context for inner nested structure.
+        let ctx = ctx.next(self.name.clone());
         let ident = self.name.clone().rustify(span, ctx.clone());
 
-        // Update context for inner nested structure.
-        let ctx = ctx.next(ident.clone());
 
         let attrs = deprecated_docs_experimental(
             ctx.clone(),
@@ -313,8 +315,8 @@ impl Rustify for TypeDeclaration {
     type Output = Vec<syn::Item>;
 
     fn rustify(self, span: Span, ctx: Option<util::Context>) -> Self::Output {
+        let ctx = ctx.next(self.id.clone());
         let ident = self.id.rustify(span, ctx.clone());
-        let ctx = ctx.next(&ident);
 
         let attrs = deprecated_docs_experimental(
             ctx.clone(),
@@ -372,10 +374,15 @@ impl Command {
         span: Span,
         ctx: Option<util::Context>,
         fields: Option<Vec<Field>>,
-        original_name: String,
         deriv_name: String,
         msg: &'static str,
     ) -> Vec<syn::Item> {
+        let original_name = match ctx {
+            Some(util::Context::Item(_, ref i)) => i,
+            _ => unimplemented!(),
+        };
+
+
         let ident = syn::Ident::new(&deriv_name, span);
 
         let fields = fields.into_iter().flatten().collect::<Vec<_>>();
@@ -390,7 +397,7 @@ impl Command {
             .unzip();
 
         let additional = additional.into_iter().flatten();
-        let attrs = info::autogenned_struct(&msg.to_string(), &original_name, span);
+        let attrs = info::autogenned_struct(&msg.to_string(), &original_name.to_string(), span);
 
         let def = syn::ItemStruct {
             attrs,
@@ -410,7 +417,12 @@ impl Command {
             .collect()
     }
 
-    fn gen_command_impl(&self, span: Span, ctx: Option<util::Context>, original: &str, ident: &syn::Ident) -> syn::ItemImpl {
+    fn gen_command_impl(
+        &self,
+        span: Span,
+        ctx: Option<util::Context>,
+        ident: &syn::Ident,
+    ) -> syn::ItemImpl {
         let trait_path = util::rust::Command(span);
 
         let assoc_type = |ident, path| syn::ImplItemType {
@@ -449,25 +461,20 @@ impl Command {
 
         let returns = assoc_type(
             "Returns",
-            if_def(
-                self.returns.is_some(),
-                "Returns",
-                util::rust::Nothing(span),
-            ),
+            if_def(self.returns.is_some(), "Returns", util::rust::Nothing(span)),
         );
 
         let error = assoc_type("Error", util::rust::Infallible(span));
 
-        let d = match ctx {
-            Some(util::Context::Domain(d)) => d,
-            Some(util::Context::Item(d, _)) => d,
-            _ => unimplemented!()
+        let (d, s) = match ctx {
+            Some(util::Context::Item(d, s)) => (d, s),
+            _ => unimplemented!(),
         };
 
         let stmt = syn::Stmt::Expr(
             syn::Expr::Lit(syn::ExprLit {
                 attrs: Default::default(),
-                lit: syn::Lit::Str(syn::LitStr::new(&format!("{d}.{original}"), span)),
+                lit: syn::Lit::Str(syn::LitStr::new(&format!("{}.{}", d.original(), s.original()), span)),
             }),
             None,
         );
@@ -520,11 +527,11 @@ impl Rustify for Command {
     type Output = Vec<syn::Item>;
 
     fn rustify(self, span: Span, ctx: Option<util::Context>) -> Self::Output {
-        let original = self.name.original().to_string();
+        let ctx = ctx.next(self.name.clone());
         let ident = self.name.clone().rustify(span, ctx.clone());
-        let ctx = ctx.next(&ident);
+        let impl_block =
+            syn::Item::Impl(self.gen_command_impl(span, ctx.clone(), &ident));
 
-        let impl_block = syn::Item::Impl(self.gen_command_impl(span, ctx.clone(), &original, &ident));
 
         let attrs = deprecated_docs_experimental(
             ctx.clone(),
@@ -554,7 +561,6 @@ impl Rustify for Command {
             span,
             ctx.clone(),
             self.parameters,
-            ident.to_string(),
             format!("{}Params", ident),
             "Parameter",
         );
@@ -562,7 +568,6 @@ impl Rustify for Command {
             span,
             ctx.clone(),
             self.returns,
-            ident.to_string(),
             format!("{}Returns", ident),
             "Return",
         );
@@ -589,8 +594,8 @@ impl Rustify for Event {
     type Output = Vec<syn::Item>;
 
     fn rustify(self, span: Span, ctx: Option<util::Context>) -> Self::Output {
+        let ctx = ctx.next(self.name.clone());
         let ident = self.name.rustify(span, ctx.clone());
-        let ctx = ctx.next(ident.clone());
 
         let attrs = deprecated_docs_experimental(
             ctx.clone(),
@@ -616,14 +621,67 @@ impl Rustify for Event {
             semi_token: Default::default(),
             generics: Default::default(),
             attrs,
-            ident,
+            ident: ident.clone(),
             fields: syn::Fields::Named(syn::FieldsNamed {
                 brace_token: Default::default(),
                 named: Punctuated::from_iter(fields),
             }),
         });
 
-        additional.chain(iter::once(strct)).collect()
+        let (d, e) = match ctx {
+            Some(util::Context::Item(d, s)) => (d, s),
+            _ => unimplemented!(),
+        };
+
+        let stmt = syn::Stmt::Expr(
+            syn::Expr::Lit(syn::ExprLit {
+                attrs: Default::default(),
+                lit: syn::Lit::Str(syn::LitStr::new(&format!("{}.{}", d.original(), e.original()), span)),
+            }),
+            None,
+        );
+
+        let id_fn = syn::ImplItem::Fn(syn::ImplItemFn {
+            attrs: Default::default(),
+            defaultness: Default::default(),
+            vis: syn::Visibility::Inherited,
+            sig: syn::Signature {
+                constness: Default::default(),
+                asyncness: Default::default(),
+                unsafety: Default::default(),
+                abi: Default::default(),
+                fn_token: Default::default(),
+                generics: Default::default(),
+                paren_token: Default::default(),
+                variadic: Default::default(),
+                ident: syn::Ident::new("id", span),
+                inputs: Punctuated::from_iter(iter::empty::<syn::FnArg>()),
+                output: syn::ReturnType::Type(
+                    Default::default(),
+                    Box::new(util::rust::static_str(span)),
+                ),
+            },
+            block: syn::Block {
+                brace_token: Default::default(),
+                stmts: vec![stmt],
+            },
+        });
+
+        let trait_path = util::rust::Event(span);
+
+        let impl_block = syn::Item::Impl(syn::ItemImpl {
+            attrs: Default::default(),
+            defaultness: Default::default(),
+            unsafety: Default::default(),
+            impl_token: Default::default(),
+            generics: Default::default(),
+            trait_: Some((None, trait_path, Default::default())),
+            self_ty: Box::new([ident.clone()].to_type_path().into()),
+            brace_token: Default::default(),
+            items: vec![id_fn]
+        });
+
+        additional.chain([strct, impl_block]).collect()
     }
 }
 
@@ -670,8 +728,8 @@ impl Rustify for Domain {
     type Output = syn::ItemMod;
 
     fn rustify(self, span: Span, ctx: Option<util::Context>) -> Self::Output {
+        let ctx = ctx.next(self.domain.clone());
         let ident = self.domain.rustify(span, ctx.clone());
-        let ctx = ctx.next(ident.clone());
 
         let attrs = deprecated_docs_experimental(
             ctx.clone(),

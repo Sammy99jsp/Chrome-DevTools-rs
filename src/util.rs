@@ -3,6 +3,18 @@ use serde::{
     Deserialize, Serialize,
 };
 
+///
+/// Any event sent by the server to the client.
+/// 
+pub trait Event {
+    fn id() -> &'static str
+        where Self: Sized;
+}
+
+
+///
+/// Links a Command to its Parameter and Return types.
+///  
 pub trait Command {
     type Parameters: DeserializeOwned;
     type Returns: Serialize;

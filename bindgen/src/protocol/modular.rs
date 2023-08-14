@@ -2,7 +2,7 @@
 //! Contains reocurring patterns used while rustify-ing.
 //!
 
-use std::{iter, marker::PhantomData};
+use std::{iter, marker::PhantomData, path::Display, ops::Deref};
 
 use proc_macro2::Span;
 use syn::{punctuated::Punctuated, PathSegment};
@@ -19,35 +19,95 @@ fn escape_identifier(unsfe: &String) -> String {
     format!("{unsfe}_")
 }
 
+pub trait Identifier: AsRef<str> {
+    fn new(s: impl ToString) -> Self;
+
+    ///
+    /// Original identifier, as parsed.
+    ///
+    fn original(&self) -> &String;
+
+    ///
+    /// Convert to convention.
+    ///
+    fn convert(self) -> String;
+}
+
 ///
 /// Identifier of a Domain, Item, Command, Event or Field.
 ///
 /// Has its own naming convention ([NamingConvention]).
 ///
 #[derive(Debug, Clone)]
-pub struct Identifier<NC: NamingConvention>(String, PhantomData<NC>);
+pub struct NamedIdentifier<NC: NamingConvention>(String, PhantomData<NC>);
 
-impl<NC: NamingConvention> Identifier<NC> {
-    pub fn new(s: impl ToString) -> Self {
+impl<NC: NamingConvention> Identifier for NamedIdentifier<NC> {
+    fn new(s: impl ToString) -> Self {
         Self(s.to_string(), PhantomData::<NC>)
     }
 
     ///
     /// Original identifier, as parsed.
     ///
-    pub fn original(&self) -> &String {
+    fn original(&self) -> &String {
         &self.0
     }
 
     ///
     /// Convert to convention.
-    /// 
-    pub fn convert(self) -> String {
+    ///
+    fn convert(self) -> String {
         NC::convert(self.0)
     }
 }
 
-impl<NC: NamingConvention> Rustify for Identifier<NC> {
+impl<NC: NamingConvention> AsRef<str> for NamedIdentifier<NC> {
+    fn as_ref(&self) -> &str {
+        &self.0
+    }
+}
+
+pub trait IntoAnyIdentifier {
+    fn to_any(&self) -> AnyIdentifier;
+}
+
+impl<NC: NamingConvention> IntoAnyIdentifier for NamedIdentifier<NC> {
+    fn to_any(&self) -> AnyIdentifier {
+        AnyIdentifier(self.0.clone(), NC::convert(self.0.clone()))
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct AnyIdentifier(String, String);
+
+impl Identifier for AnyIdentifier {
+    fn new(s: impl ToString) -> Self {
+        unimplemented!()
+    }
+
+    fn original(&self) -> &String {
+        &self.0
+    }
+
+    fn convert(self) -> String {
+        self.1
+    }
+}
+
+impl AsRef<str> for AnyIdentifier {
+    fn as_ref(&self) -> &str {
+        &self.1
+    }
+}
+
+
+impl ToString for AnyIdentifier {
+    fn to_string(&self) -> String {
+        self.1.clone()
+    }
+}
+
+impl<NC: NamingConvention> Rustify for NamedIdentifier<NC> {
     type Output = syn::Ident;
 
     fn rustify(self, _: Span, _: Option<crate::util::Context>) -> Self::Output {
@@ -58,7 +118,7 @@ impl<NC: NamingConvention> Rustify for Identifier<NC> {
     }
 }
 
-impl<NC: NamingConvention> ToString for Identifier<NC> {
+impl<NC: NamingConvention> ToString for NamedIdentifier<NC> {
     fn to_string(&self) -> String {
         NC::convert(self.0.clone())
     }
@@ -68,15 +128,15 @@ impl<NC: NamingConvention> ToString for Identifier<NC> {
 /// Type path in the format `[Domain].<Type>`
 ///
 #[derive(Debug, Clone)]
-pub struct TypePath(pub(crate) Option<Identifier<conv::Domain>>, pub(crate) Identifier<conv::Type>);
+pub struct TypePath(
+    pub(crate) Option<NamedIdentifier<conv::Domain>>,
+    pub(crate) NamedIdentifier<conv::Type>,
+);
 
 impl Rustify for TypePath {
     type Output = syn::TypePath;
 
     fn rustify(self, span: Span, ctx: Option<crate::util::Context>) -> Self::Output {
-        
-        
-
         let mut segments = self
             .0
             .map(|s| s.rustify(span, ctx.clone()))
@@ -122,7 +182,8 @@ impl Rustify for Experimental {
             bracket_token: Default::default(),
             style: syn::AttrStyle::Outer,
             meta: syn::Meta::Path(
-                vec!["util", "experimental"].into_iter()
+                vec!["util", "experimental"]
+                    .into_iter()
                     .map(util::to_ident(span))
                     .to_path(),
             ),
@@ -155,7 +216,7 @@ impl Rustify for Deperecated {
 ///
 /// Documentation for an element,
 /// split by lines.
-/// 
+///
 /// Converted into `#[doc = "..."]`
 ///
 #[derive(Debug, Clone)]

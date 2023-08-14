@@ -15,10 +15,13 @@ use convert_case::{Case, Casing};
 pub trait NamingConvention: std::fmt::Debug + Copy + Clone {
     const CASE: Case;
 
-    fn convert(src: String) -> String {
+    fn convert(src: String) -> String 
+        where Self: Sized
+    {
         src.to_case(Self::CASE)
     }
 }
+
 
 ///
 /// Naming convention for a Domain (a `mod` in Rust).

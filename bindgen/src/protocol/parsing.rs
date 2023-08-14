@@ -11,16 +11,16 @@ use serde_json::Map;
 
 use crate::protocol;
 
-use super::{convention as conv, modular as m};
+use super::{convention as conv, modular::{self as m, Identifier}};
 
-impl<'de, NC: conv::NamingConvention> Deserialize<'de> for m::Identifier<NC> {
+impl<'de, NC: conv::NamingConvention> Deserialize<'de> for m::NamedIdentifier<NC> {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
         let raw = String::deserialize(deserializer)?;
 
-        Ok(Self::new(raw))
+        Ok(<Self as Identifier>::new(raw))
     }
 }
 
@@ -124,11 +124,11 @@ impl<'de> Deserialize<'de> for m::TypePath {
             .split_once('.')
             .map(|(domain, ty)| {
                 (
-                    Some(m::Identifier::<conv::Domain>::new(domain)),
-                    m::Identifier::<conv::Type>::new(ty),
+                    Some(m::NamedIdentifier::<conv::Domain>::new(domain)),
+                    m::NamedIdentifier::<conv::Type>::new(ty),
                 )
             })
-            .unwrap_or_else(|| (None, m::Identifier::<conv::Type>::new(raw)));
+            .unwrap_or_else(|| (None, m::NamedIdentifier::<conv::Type>::new(raw)));
 
         Ok(Self(domain, ty))
     }
@@ -143,11 +143,11 @@ impl<'de> Deserialize<'de> for protocol::Primitive {
         let raw = std::string::String::deserialize(deserializer)?;
 
         match raw.as_str() {
-            "string"  => Ok(String),
-            "number"  => Ok(Number),
+            "string" => Ok(String),
+            "number" => Ok(Number),
             "boolean" => Ok(Boolean),
             "integer" => Ok(Integer),
-            "any"     => Ok(Any),
+            "any" => Ok(Any),
             _ => Err(D::Error::custom(&format!("Invalid primitive type `{raw}`"))),
         }
     }
@@ -167,7 +167,7 @@ impl<'de> Deserialize<'de> for super::Type {
             return Ok(Reference { path, optional });
         }
 
-        if let Some(values) = raw.take_optional::<Vec<m::Identifier<conv::Type>>, D>("enum")? {
+        if let Some(values) = raw.take_optional::<Vec<m::NamedIdentifier<conv::Type>>, D>("enum")? {
             return Ok(Enum { optional, values });
         }
 
@@ -224,7 +224,7 @@ impl<'de> Deserialize<'de> for super::TypeDeclaration {
         D: Deserializer<'de>,
     {
         let mut raw: Map<String, serde_json::Value> = Deserialize::deserialize(deserializer)?;
-        
+
         Ok(Self {
             id: raw.take::<_, D>("id", "Missing field `id` from TypeDeclaration declaration")?,
             description: raw.take_optional::<_, D>("description")?,
