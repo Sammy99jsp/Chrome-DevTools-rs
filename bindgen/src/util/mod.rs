@@ -2,14 +2,11 @@
 //! Collection of utility functions.
 //!
 
-mod fake_utils;
-
 use std::iter;
 
 use proc_macro2::Span;
 use syn::{punctuated::Punctuated, PathSegment};
 
-pub use fake_utils::*;
 ///
 /// > Where are we now?
 ///
@@ -166,7 +163,6 @@ pub mod rust {
 
     use proc_macro2::Span;
     use quote::ToTokens;
-    use syn::token::Brace;
 
     use super::{to_ident, ToPath, ToTypedPath};
 
@@ -258,6 +254,17 @@ pub mod rust {
                 delimiter: syn::MacroDelimiter::Paren(Default::default()),
                 tokens: path.into_token_stream(),
             }),
+        };
+
+        vec![attr]
+    }
+
+    pub fn default_variant(span: Span) -> Vec<syn::Attribute> {
+        let attr = syn::Attribute {
+            pound_token: Default::default(),
+            bracket_token: Default::default(),
+            style: syn::AttrStyle::Outer,
+            meta: syn::Meta::Path(["default"].map(to_ident(span)).to_path()),
         };
 
         vec![attr]
@@ -370,6 +377,7 @@ pub mod serde {
                     [
                         vec!["Debug"],
                         vec!["Clone"],
+                        vec!["Default"],
                         vec!["serde", "Serialize"],
                         vec!["serde", "Deserialize"],
                     ]
@@ -442,6 +450,7 @@ pub mod info {
     ///
     ///Documentation for the entire [Protocol Definition](crate::protocol::Protocol) itself.
     ///
+    #[allow(unused)]
     pub fn protocol_docs(version: String, span: Span) -> Vec<syn::Attribute> {
         #[cfg(feature = "latest")]
         let version = "latest (tip-of-tree) [{version}]".to_string();

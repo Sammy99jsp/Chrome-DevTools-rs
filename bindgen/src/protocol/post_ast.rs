@@ -1,7 +1,9 @@
 //!
-//! Operations done after AST assembly.
-//!
-//! Mainly the senario of recusrive types.
+//! Operations done after Rust AST assembly.
+//! 
+//! Right now:
+//! * Box-ing of recursive types.
+//! * Default for enum.
 //!
 
 use std::iter;
@@ -11,6 +13,11 @@ use syn::punctuated::Punctuated;
 
 use crate::util::{self, ToTypedPath};
 
+///
+/// Walk along types recursively with a predicate function
+/// until it returns true, then return a mutable reference
+/// to the statisfying type.
+/// 
 fn walk_type_path(
     ty: &mut syn::Type,
     pred: impl Fn(&syn::Type, Option<&syn::PathSegment>) -> bool + Clone,
@@ -59,6 +66,10 @@ fn walk_type_path(
     None
 }
 
+///
+/// Function that returns a predicate to check if a
+/// type matches a provided "self" type. 
+/// 
 fn is_self_referential(
     self_type: syn::TypePath,
 ) -> impl Fn(&syn::Type, Option<&syn::PathSegment>) -> bool + Clone {
@@ -72,39 +83,53 @@ fn is_self_referential(
     }
 }
 
+///
+/// Boxifies self-referential types (recursive types)
+/// where necessary.
+/// 
 pub fn boxify_self_referential_types<'a>(
     span: Span,
     items: impl Iterator<Item = &'a mut syn::ItemStruct>,
 ) {
-    items
-        .for_each(|s| {
-            let mut flag = false;
-            let p = [s.ident.clone()].to_type_path();
-            s.fields
-                .iter_mut()
-                .filter_map(|f| walk_type_path(&mut f.ty, is_self_referential(p.clone())))
-                .filter_map(|f| match f {
-                    syn::Type::Path(ref mut p) => Some(p),
-                    _ => None,
-                })
-                .for_each(|t| {
-                    let inner = t.clone();
-                    t.path.segments = Punctuated::from_iter(iter::once(syn::PathSegment {
-                        ident: syn::Ident::new("Box", span),
-                        arguments: syn::PathArguments::AngleBracketed(
-                            syn::AngleBracketedGenericArguments {
-                                colon2_token: Default::default(),
-                                lt_token: Default::default(),
-                                gt_token: Default::default(),
-                                args: Punctuated::from_iter(iter::once(
-                                    syn::GenericArgument::Type(syn::Type::Path(inner)),
-                                )),
-                            },
-                        ),
-                    }));
-                    flag = true;
-                });
-        })
+    items.for_each(|s| {
+        let mut flag = false;
+        let p = [s.ident.clone()].to_type_path();
+        s.fields
+            .iter_mut()
+            .filter_map(|f| walk_type_path(&mut f.ty, is_self_referential(p.clone())))
+            .filter_map(|f| match f {
+                syn::Type::Path(ref mut p) => Some(p),
+                _ => None,
+            })
+            .for_each(|t| {
+                let inner = t.clone();
+                t.path.segments = Punctuated::from_iter(iter::once(syn::PathSegment {
+                    ident: syn::Ident::new("Box", span),
+                    arguments: syn::PathArguments::AngleBracketed(
+                        syn::AngleBracketedGenericArguments {
+                            colon2_token: Default::default(),
+                            lt_token: Default::default(),
+                            gt_token: Default::default(),
+                            args: Punctuated::from_iter(iter::once(syn::GenericArgument::Type(
+                                syn::Type::Path(inner),
+                            ))),
+                        },
+                    ),
+                }));
+                flag = true;
+            });
+    })
+}
+
+///
+/// Adds the `#[default]` helper macro to the first of an enum's variants.
+/// 
+pub fn defaultify<'a>(span: Span, iter: impl Iterator<Item = &'a mut syn::ItemEnum>) {
+    iter.for_each(|e| {
+        if let Some(v) = e.variants.first_mut() {
+            v.attrs.extend(util::rust::default_variant(span))
+        }
+    });
 }
 
 #[cfg(test)]

@@ -1,13 +1,10 @@
 [package]
-name = "chrome-devtools-macros"
+name = "chrome-devtools-bindgen"
 version = "0.1.0"
 edition = "2021"
 authors = ["sammy99jsp <sammy99jsp@avdanos.com>"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-[lib]
-proc-macro = true
 
 [dependencies]
 convert_case = "0.6.0"
