@@ -410,7 +410,7 @@ impl Command {
             .collect()
     }
 
-    fn gen_command_impl(&self, span: Span, original: &str, ident: &syn::Ident) -> syn::ItemImpl {
+    fn gen_command_impl(&self, span: Span, ctx: Option<util::Context>, original: &str, ident: &syn::Ident) -> syn::ItemImpl {
         let trait_path = util::rust::Command(span);
 
         let assoc_type = |ident, path| syn::ImplItemType {
@@ -458,10 +458,16 @@ impl Command {
 
         let error = assoc_type("Error", util::rust::Infallible(span));
 
+        let d = match ctx {
+            Some(util::Context::Domain(d)) => d,
+            Some(util::Context::Item(d, _)) => d,
+            _ => unimplemented!()
+        };
+
         let stmt = syn::Stmt::Expr(
             syn::Expr::Lit(syn::ExprLit {
                 attrs: Default::default(),
-                lit: syn::Lit::Str(syn::LitStr::new(original, span)),
+                lit: syn::Lit::Str(syn::LitStr::new(&format!("{d}.{original}"), span)),
             }),
             None,
         );
@@ -518,7 +524,7 @@ impl Rustify for Command {
         let ident = self.name.clone().rustify(span, ctx.clone());
         let ctx = ctx.next(&ident);
 
-        let impl_block = syn::Item::Impl(self.gen_command_impl(span, &original, &ident));
+        let impl_block = syn::Item::Impl(self.gen_command_impl(span, ctx.clone(), &original, &ident));
 
         let attrs = deprecated_docs_experimental(
             ctx.clone(),
