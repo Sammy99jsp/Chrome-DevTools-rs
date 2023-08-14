@@ -22,7 +22,8 @@
 
 #![feature(associated_type_defaults)]
 pub mod util;
-pub use util::*;
 
-#[chrome_devtools_macros::protocol]
-pub mod protocol {}
+#[allow(deprecated)]
+#[allow(clippy::enum_variant_names)]
+pub mod protocol;
+pub use util::*;

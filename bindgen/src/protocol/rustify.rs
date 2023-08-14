@@ -435,13 +435,13 @@ impl Command {
             }
         };
 
+        println!("Parameters: {:?}", self.parameters);
+        println!("Returns: {:?}", self.returns);
+
         let params = assoc_type(
             "Parameters",
             if_def(
-                self.parameters
-                    .as_ref()
-                    .map(|i| i.is_empty())
-                    .unwrap_or(false),
+                self.parameters.is_some(),
                 "Params",
                 util::rust::Nothing(span),
             ),
@@ -450,10 +450,7 @@ impl Command {
         let returns = assoc_type(
             "Returns",
             if_def(
-                self.parameters
-                    .as_ref()
-                    .map(|i| i.is_empty())
-                    .unwrap_or(false),
+                self.returns.is_some(),
                 "Returns",
                 util::rust::Nothing(span),
             ),
@@ -533,12 +530,12 @@ impl Rustify for Command {
                         .chain(
                             self.parameters
                                 .is_some()
-                                .then_some(format!("Parameter Type: [{}Params]", ident)),
+                                .then_some(format!("* Parameter Type: [{}Params]", ident)),
                         )
                         .chain(
                             self.returns
                                 .is_some()
-                                .then_some(format!("Return Type: [{}Returns]", ident)),
+                                .then_some(format!("* Return Type: [{}Returns]", ident)),
                         ),
                 );
                 v
@@ -730,9 +727,18 @@ impl Rustify for Protocol {
     fn rustify(self, span: Span, _: Option<util::Context>) -> Self::Output {
         let ctx = Some(util::Context::Protocol);
         let version = self.version.to_string();
-        let attrs = protocol_docs(version, span).into_iter()
-            .chain(util::rust::allow(span, ["deprecated"].map(util::to_ident(span)).to_path()))
-            .chain(util::rust::allow(span, ["clippy", "enum_variant_names"].map(util::to_ident(span)).to_path()))
+        let attrs = iter::empty()
+            // .chain(util::rust::allow(
+            //     span,
+            //     ["deprecated"].map(util::to_ident(span)).to_path(),
+            // ))
+            // .chain(util::rust::allow(
+            //     span,
+            //     ["clippy", "enum_variant_names"]
+            //         .map(util::to_ident(span))
+            //         .to_path(),
+            // ))
+            // .chain(protocol_docs(version, span))
             .collect();
 
         let mut items = self
@@ -742,9 +748,7 @@ impl Rustify for Protocol {
             .map(syn::Item::Mod)
             .collect::<Vec<_>>();
 
-        // Solve the problem of self-referential types by Box-ing them.
-        // 0. Get all the struct definitions.
-        let structs = items
+        let mut domain_items: Vec<_> = items
             .iter_mut()
             .filter_map(|i| match i {
                 syn::Item::Mod(m) => Some(m),
@@ -752,13 +756,27 @@ impl Rustify for Protocol {
             })
             .flat_map(|i| i.content.as_mut().map(|(_, i)| i.iter_mut()))
             .flatten()
-            .filter_map(|i| match i {
-                syn::Item::Struct(s) => Some(s),
-                _ => None,
-            });
+            .collect();
+
+        // Solve the problem of self-referential types by Box-ing them.
+        // 0. Get all the struct definitions.
+
+        let structs = domain_items.iter_mut().filter_map(|i| match i {
+            syn::Item::Struct(s) => Some(s),
+            _ => None,
+        });
 
         // 1. Run them through the algorithm to boxify when necessary..
         post_ast::boxify_self_referential_types(span, structs);
+
+        // Add the `Default` marker for the first variant of each enum.
+
+        let enums = domain_items.into_iter().filter_map(|a| match a {
+            syn::Item::Enum(e) => Some(e),
+            _ => None,
+        });
+
+        post_ast::defaultify(span, enums);
 
         syn::File {
             shebang: Default::default(),

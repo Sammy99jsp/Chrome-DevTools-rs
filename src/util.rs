@@ -1,49 +1,52 @@
-#[derive(Debug, serde::Serialize)]
+use serde::{
+    de::{DeserializeOwned, Error},
+    Deserialize, Serialize,
+};
+
+pub trait Command {
+    type Parameters: DeserializeOwned;
+    type Returns: Serialize;
+    type Error: Serialize;
+
+    fn id() -> &'static str
+        where Self: Sized;
+}
+
+#[derive(Debug, Clone)]
 pub struct Nothing;
 
-use serde::de::Error;
-
-impl<'de> serde::Deserialize<'de> for Nothing {
+impl<'de> Deserialize<'de> for Nothing {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
         let map: serde_json::Map<String, serde_json::Value> =
-            serde_json::Map::deserialize(deserializer)?;
-        if !map.is_empty() {
-            return Err(D::Error::custom("Expected empty params."));
+            Deserialize::deserialize(deserializer)?;
+        if map.is_empty() {
+            Ok(Self)
+        } else {
+            Err(D::Error::custom("Nothing struct has content!"))
         }
-
-        Ok(Self)
     }
 }
 
-pub trait Command {
-    type Parameters: serde::de::DeserializeOwned;
-    type Returns: serde::ser::Serialize;
-    type Error: serde::ser::Serialize = Infallible;
-
-    fn id() -> &'static str;
+impl Serialize for Nothing {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serde_json::Map::<String, serde_json::Value>::new().serialize(serializer)
+    }
 }
 
-pub type CommandExecutor<C> = Box<
-    dyn Fn(<C as Command>::Parameters) -> Result<<C as Command>::Returns, <C as Command>::Error>,
->;
-
-pub trait IntoCommandExecutor<C: Command> {
-    fn into_executor(self) -> CommandExecutor<C>;
-}
-
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, Clone)]
 pub enum Infallible {}
 
-impl<C, F> IntoCommandExecutor<C> for F
-where
-    C: Command,
-    F: Fn(<C as Command>::Parameters) -> Result<<C as Command>::Returns, <C as Command>::Error>
-        + 'static,
-{
-    fn into_executor(self) -> CommandExecutor<C> {
-        Box::new(self)
+impl Serialize for Infallible {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serde_json::Value::Null.serialize(serializer)
     }
 }

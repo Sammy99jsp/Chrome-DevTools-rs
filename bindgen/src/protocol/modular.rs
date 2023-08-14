@@ -86,7 +86,7 @@ impl Rustify for TypePath {
             .collect::<Vec<_>>();
 
         if segments.len() == 2 {
-            let root = ["crate", "protocol_test"]
+            let root = ["crate", "protocol"]
                 .map(util::to_ident(span))
                 .map(PathSegment::from)
                 .into_iter();
